@@ -135,8 +135,22 @@ Note: Augmentation details live in README files and will be captured in per-run 
 
 ---
 
-## 7. Demo Interface (Pending — user will specify)
-> Section to be expanded when user provides details for Gradio demo requirements, upload format, output display preferences (bounding boxes, confidence thresholds), and deployment context.
+## 7. Demo Interface (Confirmed — brief spec; elaboration later)
+
+**Interface type:** Simple React web application.
+
+**Core functionality (confirmed):**
+- User uploads an image via browser/file picker.
+- The model (final selected YOLOv8n or YOLOv8s) detects defects.
+- Results displayed visually with bounding boxes overlaid on the uploaded image.
+
+**Pending elaboration (user will specify later):**
+- Deployment context (local server, Gradio wrapper, or standalone React build?)
+- Confidence threshold for displaying detections
+- Additional UI details (class labels, confidence scores, download result, multi-image batch upload)
+- Integration approach: will React call a Python backend (e.g., Flask/FastAPI serving the YOLO model), or will the model run within the browser (e.g., ONNX/WebAssembly)?
+
+**Location (to be decided):** Suggested `demo/` or `frontend/` directory at project root. To be confirmed when elaboration is provided.
 
 ---
 
