@@ -65,8 +65,8 @@ Note: Augmentation details live in README files and will be captured in per-run 
 **Fine-tuning strategy:** Full fine-tune (unfreeze all layers). No backbone frozen.
 
 **Batch / workers (Fedora, 4GB allocated from 6GB GPU):**
-- YOLOv8n: `batch=8`, `workers=2` (per PRD; user confirmed `batch=8` for n).
-- YOLOv8s: `batch=6` with `amp=True` (mixed precision) recommended due to ~3.5× larger param count; `batch=9` is tight on 4GB with full unfreeze.
+- YOLOv8n: `batch=8`, `amp=True`, `seed=42`, `workers=2`
+- YOLOv8s: `batch=6`, `amp=True`, `seed=42`, `workers=2`
 
 **Hyperparameter policy (confirmed):**
 - Each experiment uses one small YAML config file (e.g., `configs/yolov8n_baseline.yaml`, `configs/yolov8s_baseline.yaml`).
@@ -77,7 +77,8 @@ Note: Augmentation details live in README files and will be captured in per-run 
   - The winning model (n or s) and its best hyperparameter variant
   - A comparison table: model | epochs | LR | augmentation | batch | mAP@0.50 | mAP@0.50:0.95
   - The winning hyperparameter values
-- Before final selection, this section remains open; the comparison table will be added after step 5 (hyperparameter experimentation).
+- Reproducibility: `seed=42` set in both YAML configs for consistent weight initialization and data shuffling.
+- Evaluation must use `split="test"` explicitly (`model.val(data=..., split="test")`) since default `val()` uses the validation split.
 
 **Standard YAML filenames (confirmed):** `configs/yolov8n_baseline.yaml`, `configs/yolov8s_baseline.yaml`, etc.
 
