@@ -1,0 +1,13 @@
+# YOLOv8s Baseline Config
+# Source of truth for this experiment — edit directly; bible.md only records final results.
+# Note: batch=6 + amp=true recommended for ~11.2M params within 4GB VRAM.
+model: yolov8s.pt
+data: "PCB Defect.v3i.yolov8/data.yaml"
+epochs: 50
+imgsz: 640
+batch: 6
+workers: 2
+amp: true
+lr0: 0.01
+lrf: 0.01
+verbose: true

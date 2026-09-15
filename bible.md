@@ -14,49 +14,135 @@ This project builds an automated deep-learning-based system that detects and loc
 
 ---
 
-## 2. Data Acquisition — CLARIFYING QUESTIONS (Pending)
+## 2. Data Acquisition (Confirmed — 2026-09-15)
 
-Before writing the dataset plan, please confirm:
+**Dataset folder:** `PCB Defect.v3i.yolov8/` (located in project root; path contains spaces — reference with quotes in scripts).
 
-- **Dataset source:** PKU-Market-PCB via Roboflow API? Or a manual zip upload? What is the exact dataset URL / API endpoint?
-- **Format on disk:** Will the dataset arrive as `train/valid/test` folders with `images/` and `labels/` in YOLO format, plus a `data.yaml`?
-- **Image specs:** What are the image dimensions / resolution? Are they all uniform?
-- **Class counts / imbalance:** Should we assume class imbalance exists? Do you want a class-distribution table recorded here?
-- **Split ratios:** Confirm train/valid/test split percentages (default from dataset?)
-- **Storage location:** `data/PKU-Market-PCB/` — confirm path.
+**Source / provenance:** PKU-Market-PCB dataset, exported via Roboflow (workspace `ta-4ixjm`, project `pcb-defect-gad22`, version 3, CC BY 4.0). URL referenced in `data.yaml`.
+
+**Format on disk:** `train/`, `valid/`, `test/` folders, each with `images/` and `labels/` subfolders. `data.yaml` defines class names, split paths, and metadata.
+
+**Image specs:** Uniform 640x640 (Resize — Stretch), confirmed by `README.roboflow.txt`. Pre-processing: auto-orientation (EXIF stripped), resize to 640x640, auto-contrast via contrast stretching.
+
+**Augmentation applied (from README.roboflow.txt):**
+- 50% horizontal flip
+- 50% vertical flip
+- Random rotation: -15° to +15°
+- Random brightness: -15% to +15%
+- 3 versions of each source image created
+
+Note: Augmentation details live in README files and will be captured in per-run config YAMLs during experimentation; this file references them but does not duplicate inline values.
+
+**Split ratios (confirmed by file counts):**
+- Train: 20,370 images (82%)
+- Valid: 2,265 images (9%)
+- Test: 2,266 images (9%)
+- Total: 24,901 images
+
+**Class counts — train labels (recorded for imbalance tracking):**
+
+| Class ID | Defect Name | Count |
+|----------|-------------|-------|
+| 0 | missing_hole | 7,406 |
+| 1 | mouse_bite | 7,249 |
+| 2 | open_circuit | 7,135 |
+| 3 | short | 7,220 |
+| 4 | spur | 7,275 |
+| 5 | spurious_copper | 7,610 |
+
+**Class imbalance:** Confirmed — counts vary from 7,135 (open_circuit) to 7,610 (spurious_copper). Difference ~475 instances (~6.6%). This will be reflected in the final evaluation comparison table and may influence augmentation or class-weight choices during hyperparameter experimentation.
 
 ---
 
-## 3. Model Fine-Tuning — CLARIFYING QUESTIONS (Pending)
+## 3. Model Fine-Tuning (Confirmed — 2026-09-15)
 
-Before defining the training protocol, please confirm:
+**Architecture:**
+- Baseline: YOLOv8n (nano) — ~3.2M params, COCO-pretrained (`yolov8n.pt`).
+- Comparison: YOLOv8s (small) — ~11.2M params (~3.5× larger), COCO-pretrained (`yolov8s.pt`).
 
-- **Architecture:** YOLOv8n (nano) as baseline, YOLOv8s (small) as comparison — is that final?
-- **Pretrained weights:** COCO-pretrained from Ultralytics (`yolov8n.pt`, `yolov8s.pt`) — confirm.
-- **Head replacement:** Replace detection head for 6-class task — confirm.
-- **Fine-tuning strategy:** Full fine-tune (unfreeze all) or freeze backbone? What layers frozen (if any)?
-- **Batch / workers (Fedora, 4GB allocated, 6GB GPU):** Confirm `batch=8`, `workers=2` (Linux-safe).
-- **Epochs / LR / augmentation:** Should hyperparameters be listed in this file once decided, or kept in a separate config?
-- **Evaluation metric:** mAP@0.50? mAP@0.50:0.95? Confirm target metric for final model selection.
+**Head replacement:** Detection head replaced for 6-class task (`nc: 6` in `data.yaml`).
+
+**Fine-tuning strategy:** Full fine-tune (unfreeze all layers). No backbone frozen.
+
+**Batch / workers (Fedora, 4GB allocated from 6GB GPU):**
+- YOLOv8n: `batch=8`, `workers=2` (per PRD; user confirmed `batch=8` for n).
+- YOLOv8s: `batch=6` with `amp=True` (mixed precision) recommended due to ~3.5× larger param count; `batch=9` is tight on 4GB with full unfreeze.
+
+**Hyperparameter policy (confirmed):**
+- Each experiment uses one small YAML config file (e.g., `configs/yolov8n_baseline.yaml`, `configs/yolov8s_baseline.yaml`).
+- Configs contain: epochs, lr, img_size, batch, workers, augmentation flags, `amp`, and any other run-specific settings.
+- Hyperparameters are NOT hardcoded into this planning document; inline values would need constant edits and go stale.
+- Config files are the source of truth for re-running any specific experiment.
+- Once experimentation concludes and a final configuration is chosen, this file (`bible.md`) will record ONLY:
+  - The winning model (n or s) and its best hyperparameter variant
+  - A comparison table: model | epochs | LR | augmentation | batch | mAP@0.50 | mAP@0.50:0.95
+  - The winning hyperparameter values
+- Before final selection, this section remains open; the comparison table will be added after step 5 (hyperparameter experimentation).
+
+**Standard YAML filenames (confirmed):** `configs/yolov8n_baseline.yaml`, `configs/yolov8s_baseline.yaml`, etc.
+
+**Configuration directory:** `configs/` (to be created).
+
+**VRAM assessment — YOLOv8s at 4GB (user-requested check):**
+- YOLOv8s (~11.2M params) with full unfreeze, batch=6, 640×640 images, `amp=True`: estimated feasible within 4GB, but tight.
+- If OOM occurs during the s run: reduce batch to 4, enable `workers=0` temporarily, or switch to gradient accumulation (`batch=6` simulated with `accum=2` at `batch=3`).
+- YOLOv8n (`batch=8`) is comfortably within 4GB.
+- Recommendation for experimentation: start `yolov8s_baseline.yaml` with `batch: 6`, `amp: true`, `workers: 2`. Monitor GPU memory; adjust downward if needed.
+
+**Evaluation metrics (confirmed):**
+- Default / primary: `mAP@0.50`
+- Secondary: `mAP@0.50:0.95` (COCO standard)
+- Both will be reported; final model selection uses the stronger validation metric, with `mAP@0.50` as the default decision criterion.
+
+**Model weights storage:** Final best weights saved to `models/` (directory excluded from `.gitignore` for large files; weights may be tracked separately or downloaded on-demand).
+
+**Runs / training outputs:** `runs/` (excluded from git via `.gitignore`).
 
 ---
 
-## 4. Environment (Fixed from User Input)
+## 4. Environment (Fixed — 2026-09-15)
 
 - **OS:** Fedora Workstation (Linux)
-- **GPU:** 6GB total VRAM → allocate 4GB to project
+- **GPU:** 6GB total VRAM → 4GB allocated to project
 - **Virtual env:** Python `venv` (`.venv/`)
-- **Batch size:** 8 (4GB allocation)
-- **Workers:** 2 (Linux-safe, avoids hangs)
+- **Batch size:** 8 (YOLOv8n), 6 with `amp=True` (YOLOv8s)
+- **Workers:** 2 (Linux-safe, avoids training hangs)
 - **Packages:** `ultralytics`, `torch` (CUDA), `gradio`, `jupyter`, `numpy`, `pandas`, `matplotlib`
-- **Git repo:** Initialized; `.gitignore` excludes `.venv/`, `data/`, `models/`, `runs/`, `results/`, `.env`
+- **Git repo:** Initialized (`64cdaa2` initial commit: `.gitignore`, `bible.md`)
+- **.gitignore exclusions:** `.venv/`, `data/`, `models/`, `runs/`, `results/`, `.env`, Jupyter checkpoints, OS artifacts
 
 ---
 
-## 5. Pending User Inputs (Rest Details)
+## 5. Hyperparameter Experimentation — Config Policy (Confirmed)
 
-> The user will specify remaining details for documentation, reporting, demo interface, and literature references. Once specified, this section will expand into sections 6, 7, 8 (Demo, Documentation, References) matching the PRD steps 6–8.
+- Config files live in `configs/`.
+- One YAML per run (standard filenames: `yolov8n_baseline.yaml`, `yolov8s_baseline.yaml`, etc.).
+- Each YAML specifies: `model`, `data` path, `epochs`, `imgsz`, `batch`, `workers`, `amp`, `lr0`, `lrf`, augmentation flags, and any other run variables.
+- Config YAMLs are the reproducible source of truth; `bible.md` only reflects the final winning values and comparison table.
+- After experimentation concludes (step 5 of PRD), this section will be expanded with:
+  - Final selected model
+  - Winning hyperparameters (from the winning YAML)
+  - Comparison table (all variants: model, epochs, LR, augmentation, batch, mAP@50, mAP@50:0.95)
 
 ---
 
-*Created: 2026-09-15. Updated by agent only after clarifying questions are answered.*
+## 6. Dataset Reference Details
+
+- `PCB Defect.v3i.yolov8/data.yaml`: defines `nc: 6`, class names, split paths relative to dataset root (`../train/images`, etc.).
+- `README.roboflow.txt`: augmentation details, export metadata, dataset statistics (24,901 images).
+- `README.dataset.txt`: additional dataset-level notes (if present).
+- Storage: dataset remains in project root (`PCB Defect.v3i.yolov8/`) and is excluded from git via `.gitignore` (`data/` pattern does not cover this folder name; note: actual folder is in root, not `data/`). If needed, add folder name to `.gitignore` explicitly.
+
+---
+
+## 7. Demo Interface (Pending — user will specify)
+> Section to be expanded when user provides details for Gradio demo requirements, upload format, output display preferences (bounding boxes, confidence thresholds), and deployment context.
+
+---
+
+## 8. Documentation & Reporting (Pending — user will specify)
+> Section to be expanded when user provides details for final report structure, literature references on PCB defect detection, and any additional conclusions or limitations to document. References to `README.roboflow.txt` and `data.yaml` will be included in reporting.
+
+---
+
+*Created: 2026-09-15. Updated: 2026-09-15. Updated by agent after all clarifying questions answered (batch=8 for n, batch=6+amp for s; configs in `configs/`; class table added; hyperparameter policy defined; evaluation metrics confirmed).*

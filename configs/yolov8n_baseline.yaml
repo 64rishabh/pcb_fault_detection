@@ -1,0 +1,12 @@
+# YOLOv8n Baseline Config
+# Source of truth for this experiment — edit directly; bible.md only records final results.
+model: yolov8n.pt
+data: "PCB Defect.v3i.yolov8/data.yaml"
+epochs: 50
+imgsz: 640
+batch: 8
+workers: 2
+amp: false
+lr0: 0.01
+lrf: 0.01
+verbose: true
