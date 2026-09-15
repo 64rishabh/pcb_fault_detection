@@ -150,7 +150,7 @@ Note: Augmentation details live in README files and will be captured in per-run 
 - Additional UI details (class labels, confidence scores, download result, multi-image batch upload)
 - Integration approach: will React call a Python backend (e.g., Flask/FastAPI serving the YOLO model), or will the model run within the browser (e.g., ONNX/WebAssembly)?
 
-**Location (to be decided):** Suggested `demo/` or `frontend/` directory at project root. To be confirmed when elaboration is provided.
+**Location:** `frontend/` directory at project root (to be created when elaboration is provided).
 
 ---
 
