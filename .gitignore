@@ -1,0 +1,25 @@
+# Python / Virtual Environment
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter / Notebook
+.ipynb_checkpoints/
+
+# Dataset (large, not committed)
+data/
+
+# Model weights / runs (large)
+models/
+runs/
+results/
+
+# Environment / secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db
