@@ -62,7 +62,7 @@ with gr.Blocks(title="PCB Defect Detection Dashboard") as demo:
     btn.click(
         fn=predict,
         inputs=img_input,
-        outputs=[out_n_img, out_n_text, out_s_img, out_s_text],
+        outputs=[out_n_img, out_s_img, out_n_text, out_s_text],
     )
 
 if __name__ == "__main__":
