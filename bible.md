@@ -77,6 +77,19 @@ Note: Augmentation details live in README files and will be captured in per-run 
   - The winning model (n or s) and its best hyperparameter variant
   - A comparison table: model | epochs | LR | augmentation | batch | mAP@0.50 | mAP@0.50:0.95
   - The winning hyperparameter values
+- Benchmark results (test split, `split="test"`) recorded after experimentation:
+
+| Metric | YOLOv8n (nano) | YOLOv8s (small) |
+|---|---|---|
+| **mAP@0.50** | 0.9908 | 0.9924 |
+| **mAP@0.50:0.95** | 0.5738 | 0.6212 |
+| **Precision (P)** | 0.9808 | 0.9820 |
+| **Recall (R)** | 0.9856 | 0.9912 |
+| **F1** | 0.9832 | 0.9866 |
+| Per-class F1 (missing_hole / mouse_bite / open_circuit / short / spur / spurious_copper) | 0.984 / 0.977 / 0.985 / 0.984 / 0.983 / 0.985 | 0.984 / 0.982 / 0.989 / 0.987 / 0.991 / 0.987 |
+
+- Source: `results/benchmark_n.json`, `results/benchmark_s.json` (extracted via `YOLO.val(split="test")`).
+- Winner: `YOLOv8s` outperforms `YOLOv8n` on all overall metrics (`mAP@0.50`: +0.0016, `mAP@0.50:0.95`: +0.0474, `F1`: +0.0034), with tighter per-class F1 spread (0.984–0.991 vs 0.977–0.985). Given the user's instruction to ignore class imbalance and compare only `n` vs `s`, `s` is the stronger baseline.
 - Reproducibility: `seed=42` set in both YAML configs for consistent weight initialization and data shuffling.
 - Evaluation must use `split="test"` explicitly (`model.val(data=..., split="test")`) since default `val()` uses the validation split.
 
