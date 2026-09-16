@@ -8,6 +8,7 @@ imgsz: 640
 batch: 6
 workers: 2
 amp: true
+seed: 42
 lr0: 0.01
 lrf: 0.01
 verbose: true
