@@ -60,7 +60,20 @@ Note: Augmentation details live in README files and will be captured in per-run 
 - Baseline: YOLOv8n (nano) — ~3.2M params, COCO-pretrained (`yolov8n.pt`).
 - Comparison: YOLOv8s (small) — ~11.2M params (~3.5× larger), COCO-pretrained (`yolov8s.pt`).
 
-**Head replacement:** Detection head replaced for 6-class task (`nc: 6` in `data.yaml`).
+**Architecture details (YOLOv8 — confirmed from `ultralytics` docs and code inspection):**
+- **Backbone:** CSPDarknet53 (Cross Stage Partial Darknet) — feature extractor that splits feature maps into two parts (one through dense blocks, one bypassed), then concatenates, reducing computation while preserving gradient flow. YOLOv8n uses a scaled version (~3.2M params); YOLOv8s uses a wider/deeper scaled version (~11.2M params).
+- **Neck:** PANet (Path Aggregation Network) combined with FPN (Feature Pyramid Network) — aggregates features from different backbone stages via bottom-up and top-down pathways, producing multi-scale feature maps for small/medium/large objects.
+- **Head:** `Detect` module (replaced for this task). Original COCO head outputs 80 classes (`nc=80`); replaced with `nc=6` for PCB defects. The head predicts bounding box coordinates (`x, y, w, h`), objectness score, and class probabilities for each anchor at three feature-map scales (P3/8, P4/16, P5/32).
+- **Head replacement mechanism:** `YOLO("yolov8n.pt").train(...)` loads pretrained weights, then `model.yaml` overrides `nc=6` (confirmed in training logs: `Overriding model.yaml nc=80 with nc=6`). The final detection layer weights are randomly initialized for the 6 new classes; all other layers retain pretrained COCO weights.
+
+**Augmentation pipeline (applied to dataset before training):**
+- Horizontal flip (50%)
+- Vertical flip (50%)
+- Random rotation: -15° to +15°
+- Brightness adjustment: -15% to +15%
+- Contrast stretching (auto-contrast via histogram equalization in `README.roboflow.txt`)
+- Resize to uniform 640×640 (Stretch, not crop)
+- 3 augmented variants generated per source image (total dataset expanded from ~8,300 source images to 24,901)
 
 **Fine-tuning strategy:** Full fine-tune (unfreeze all layers). No backbone frozen.
 
@@ -149,27 +162,39 @@ Note: Augmentation details live in README files and will be captured in per-run 
 
 ---
 
-## 7. Demo Interface (Confirmed — brief spec; elaboration later)
+## 7. Demo Interface (Implemented — Gradio Dashboard)
 
-**Interface type:** Simple React web application.
+**Interface type:** Gradio web application (`frontend/app_gradio.py` — not React; user corrected to Gradio during session).
 
-**Core functionality (confirmed):**
-- User uploads an image via browser/file picker.
-- The model (final selected YOLOv8n or YOLOv8s) detects defects.
-- Results displayed visually with bounding boxes overlaid on the uploaded image.
+**Core functionality (implemented):**
+- User uploads an image via browser/file picker (`gr.Image(type="filepath")`).
+- The dashboard runs predictions using both fine-tuned best weights (`models/yolov8n_best.pt` and `models/yolov8s_best.pt`) on the same uploaded image.
+- Results displayed side-by-side: original + annotated images for `n` and `s`, plus text summaries with detected class names and confidence scores.
+- Bounding boxes overlaid with labels (`missing_hole 0.91`, etc.).
+- Confidence threshold: `conf=0.25` (hardcoded in `predict()` function).
 
-**Pending elaboration (user will specify later):**
-- Deployment context (local server, Gradio wrapper, or standalone React build?)
-- Confidence threshold for displaying detections
-- Additional UI details (class labels, confidence scores, download result, multi-image batch upload)
-- Integration approach: will React call a Python backend (e.g., Flask/FastAPI serving the YOLO model), or will the model run within the browser (e.g., ONNX/WebAssembly)?
+**Deployment:** Local Gradio server (`python app_gradio.py` launches at `http://0.0.0.0:7860`). Not deployed externally; runs in same `.venv` environment.
 
-**Location:** `frontend/` directory at project root (to be created when elaboration is provided).
+**Location:** `frontend/app_gradio.py` at project root (next to `frontend/README.md` placeholder, which remains as a brief spec reference).
 
 ---
 
-## 8. Documentation & Reporting (Pending — user will specify)
-> Section to be expanded when user provides details for final report structure, literature references on PCB defect detection, and any additional conclusions or limitations to document. References to `README.roboflow.txt` and `data.yaml` will be included in reporting.
+## 8. Documentation & Reporting (Updated — 2026-09-16)
+
+**References to include in any final report:**
+- `README.roboflow.txt`: dataset augmentation details (flip 50%, rotate ±15°, brightness ±15%, contrast stretching, 640×640 resize, 3 variants per source).
+- `PCB Defect.v3i.yolov8/data.yaml`: dataset split definitions (`train` 20,370, `valid` 2,265, `test` 2,266), class names mapped to IDs 0–5.
+- `configs/yolov8n_baseline.yaml` and `configs/yolov8s_baseline.yaml`: source-of-truth hyperparameters (`batch: 8/6`, `amp: true`, `seed: 42`, `epochs: 50`, `imgsz: 640`).
+- Model architecture reference: `ultralytics` YOLOv8 (`yolov8n.pt`, `yolov8s.pt`) — CSPDarknet53 backbone, PANet neck, Detect head.
+- Benchmark source: `benchmarks/benchmark_n.json` and `benchmarks/benchmark_s.json` (extracted from `YOLO.val(split="test")` using `mean_results()`, `maps`, `class_result(i)`).
+
+**Conclusions and limitations:**
+- `YOLOv8s` outperforms `YOLOv8n` on all overall metrics (`mAP@0.50`: +0.0016; `mAP@0.50:0.95`: +0.0474; `F1`: +0.0034) with tighter per-class spread.
+- Full fine-tune applied; no backbone frozen; head replaced for 6 classes (`nc=6`).
+- Class imbalance (~6.6% variation) noted but not corrected (per user instruction: ignore imbalance, compare only `n` vs `s`).
+- `YOLOv8s` required `workers=0` due to Linux `multiprocessing` hang (`ConnectionResetError`) in this Fedora environment; `batch=6` + `amp=True` kept within 4GB VRAM.
+- Gradio demo (`app_gradio.py`) provides side-by-side predictions with bounding boxes, class labels, and confidence scores; uses both fine-tuned best weights (`models/yolov8n_best.pt`, `models/yolov8s_best.pt`).
+- Reproducibility: `seed=42` fixed; config YAMLs are source of truth; evaluation explicitly uses `split="test"`.
 
 ---
 
